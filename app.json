@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "FF Scanner",
+    "slug": "ff-scanner-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#16a34a"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.farmersfactory.scanner",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan QR codes and barcodes on boxes.",
+        "NSPhotoLibraryUsageDescription": "This app accesses photos for QC evidence."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#16a34a"
+      },
+      "package": "com.farmersfactory.scanner",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow FF Scanner to access your camera to scan box labels."
+        }
+      ]
+    ],
+    "scheme": "ff-scanner",
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
+  }
+}
