@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/AuthContext';
@@ -24,7 +24,32 @@ import DeliveryConfirmScreen from '@/screens/driver/DeliveryConfirmScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// ── Hub Manager Tab Navigator ─────────────────────
+// ── Hub header title with hub badge ──────────────────────
+function HubHeaderTitle({ routeName }: { routeName: string }) {
+  const { hub } = useAuth();
+  return (
+    <View>
+      <Text style={styles.headerTitle}>{routeName}</Text>
+      {hub && (
+        <Text style={styles.headerSubtitle}>
+          📍 {hub.name}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+// ── Hub sign-out button ───────────────────────────────────
+function SignOutButton() {
+  const { signOut } = useAuth();
+  return (
+    <TouchableOpacity onPress={signOut} style={{ marginRight: 14 }}>
+      <Ionicons name="log-out-outline" size={22} color="#fff" />
+    </TouchableOpacity>
+  );
+}
+
+// ── Hub Manager Tab Navigator ─────────────────────────────
 function HubTabs() {
   return (
     <Tab.Navigator
@@ -43,6 +68,9 @@ function HubTabs() {
         headerStyle: { backgroundColor: '#16a34a' },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '700' },
+        // Hub name under each screen title
+        headerTitle: () => <HubHeaderTitle routeName={route.name} />,
+        headerRight: () => <SignOutButton />,
       })}
     >
       <Tab.Screen name="Dashboard" component={HubDashboard} />
@@ -60,13 +88,18 @@ function HubStack() {
       <Stack.Screen
         name="QC"
         component={QCScreen}
-        options={{ headerShown: true, title: 'QC Check', headerStyle: { backgroundColor: '#16a34a' }, headerTintColor: '#fff' }}
+        options={{
+          headerShown: true,
+          title: 'QC Check',
+          headerStyle: { backgroundColor: '#16a34a' },
+          headerTintColor: '#fff',
+        }}
       />
     </Stack.Navigator>
   );
 }
 
-// ── Driver Tab Navigator ──────────────────────────
+// ── Driver Tab Navigator ──────────────────────────────────
 function DriverTabs() {
   return (
     <Tab.Navigator
@@ -75,7 +108,7 @@ function DriverTabs() {
           const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
             'My Route': 'map-outline',
             'Scan Pack': 'barcode-outline',
-            'Deliver': 'checkmark-circle-outline',
+            Deliver: 'checkmark-circle-outline',
           };
           return <Ionicons name={icons[route.name] ?? 'ellipse-outline'} size={size} color={color} />;
         },
@@ -85,6 +118,7 @@ function DriverTabs() {
         headerStyle: { backgroundColor: '#2563eb' },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '700' },
+        headerRight: () => <SignOutButton />,
       })}
     >
       <Tab.Screen name="My Route" component={DriverDashboard} />
@@ -94,7 +128,7 @@ function DriverTabs() {
   );
 }
 
-// ── Root Navigator ────────────────────────────────
+// ── Root Navigator ────────────────────────────────────────
 export default function AppNavigator() {
   const { session, profile, loading } = useAuth();
 
@@ -102,7 +136,7 @@ export default function AppNavigator() {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#16a34a" />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>Loading…</Text>
       </View>
     );
   }
@@ -115,7 +149,6 @@ export default function AppNavigator() {
         ) : profile?.role === 'driver' ? (
           <Stack.Screen name="DriverRoot" component={DriverTabs} />
         ) : (
-          // hub_manager, gm, admin all get Hub view by default
           <Stack.Screen name="HubRoot" component={HubStack} />
         )}
       </Stack.Navigator>
@@ -131,8 +164,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4',
     gap: 12,
   },
-  loadingText: {
-    color: '#6b7280',
-    fontSize: 14,
+  loadingText: { color: '#6b7280', fontSize: 14 },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: 11,
+    fontWeight: '500',
   },
 });

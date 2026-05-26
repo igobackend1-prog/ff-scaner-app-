@@ -13,6 +13,8 @@ export interface Profile {
   hub_id: string | null;
   avatar_url: string | null;
   created_at: string;
+  // joined via getProfile()
+  hub?: Hub;
 }
 
 export interface Hub {

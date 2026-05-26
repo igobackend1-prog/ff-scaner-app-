@@ -171,8 +171,31 @@ export async function updatePackStatus(packId: string, status: string) {
 export async function getProfile(userId: string) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('*')
+    .select('*, hub:hubs(id, name, code, address)')
     .eq('id', userId)
     .single();
+  return { data, error };
+}
+
+/** Fetch boxes scoped to the current manager's hub */
+export async function getHubBoxes(hubId: string, status?: string) {
+  let query = supabase
+    .from('boxes')
+    .select('*, product:products(id, name, sku, unit), hub:hubs(id, name, code)')
+    .eq('hub_id', hubId)
+    .order('created_at', { ascending: false });
+  if (status) query = query.eq('status', status);
+  return query;
+}
+
+/** Fetch today's inventory events for a hub */
+export async function getHubInventoryToday(hubId: string) {
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabase
+    .from('inventory_log')
+    .select('*')
+    .eq('hub_id', hubId)
+    .gte('created_at', `${today}T00:00:00`)
+    .lte('created_at', `${today}T23:59:59`);
   return { data, error };
 }

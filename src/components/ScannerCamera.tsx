@@ -19,11 +19,20 @@ interface Props {
 
 const { width } = Dimensions.get('window');
 const FRAME_SIZE = width * 0.7;
+const CORNER_SIZE = 28;
+const CORNER_THICKNESS = 4;
 
 export default function ScannerCamera({ onScan, active = true, hint }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const cooldown = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-request permission as soon as we know it's not granted
+  useEffect(() => {
+    if (permission !== null && !permission.granted && permission.canAskAgain) {
+      requestPermission();
+    }
+  }, [permission]);
 
   useEffect(() => {
     return () => {
@@ -37,81 +46,83 @@ export default function ScannerCamera({ onScan, active = true, hint }: Props) {
     Vibration.vibrate(80);
 
     let parsed: QRPayload | null = null;
-    // Try parsing as QR JSON payload
     try {
       const obj = JSON.parse(data);
-      if (obj.box_id && obj.box_code) {
-        parsed = obj as QRPayload;
-      }
-    } catch {
-      // Not JSON — it's a plain barcode string (box_code)
-    }
+      if (obj.box_id && obj.box_code) parsed = obj as QRPayload;
+    } catch { /* plain barcode */ }
 
-    const result: ScanResult = {
-      type: parsed ? 'qr' : 'barcode',
-      data,
-      parsed,
-    };
-
-    onScan(result);
-
-    // Allow re-scan after 2s
+    onScan({ type: parsed ? 'qr' : 'barcode', data, parsed });
     cooldown.current = setTimeout(() => setScanned(false), 2000);
   };
 
-  if (!permission) {
-    return <View style={styles.container} />;
+  // Permission still loading
+  if (permission === null) {
+    return (
+      <View style={styles.center}>
+        <Ionicons name="camera-outline" size={48} color="#16a34a" />
+        <Text style={styles.centerText}>Requesting camera…</Text>
+      </View>
+    );
   }
 
+  // Permission denied permanently
   if (!permission.granted) {
     return (
-      <View style={styles.permissionContainer}>
-        <Ionicons name="camera-outline" size={48} color="#9ca3af" />
-        <Text style={styles.permissionTitle}>Camera Access Needed</Text>
-        <Text style={styles.permissionText}>
-          FF Scanner needs camera access to scan box labels.
+      <View style={styles.center}>
+        <Ionicons name="camera-off-outline" size={56} color="#9ca3af" />
+        <Text style={styles.permTitle}>Camera Access Needed</Text>
+        <Text style={styles.permText}>
+          FF Scanner needs camera permission to scan box labels.
         </Text>
         <TouchableOpacity style={styles.permBtn} onPress={requestPermission}>
-          <Text style={styles.permBtnText}>Grant Permission</Text>
+          <Text style={styles.permBtnText}>Grant Camera Permission</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  // Camera ready — full screen view
   return (
-    <View style={styles.container}>
+    <View style={styles.fullScreen}>
       <CameraView
-        style={StyleSheet.absoluteFillObject}
+        style={styles.camera}
         facing="back"
-        onBarcodeScanned={active ? handleBarcodeScanned : undefined}
+        onBarcodeScanned={active && !scanned ? handleBarcodeScanned : undefined}
         barcodeScannerSettings={{
-          barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8'],
+          barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8', 'upc_a', 'upc_e'],
         }}
       />
 
-      {/* Overlay with cutout */}
-      <View style={styles.overlay}>
-        <View style={styles.overlayTop} />
-        <View style={styles.overlayMiddle}>
-          <View style={styles.overlaySide} />
+      {/* Overlay */}
+      <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        {/* Top dark band */}
+        <View style={styles.bandTop} />
+
+        {/* Middle row */}
+        <View style={styles.middle}>
+          <View style={styles.bandSide} />
           {/* Scan frame */}
-          <View style={[styles.frame, scanned && styles.frameScanned]}>
-            {/* Corner markers */}
-            <View style={[styles.corner, styles.cornerTL]} />
-            <View style={[styles.corner, styles.cornerTR]} />
-            <View style={[styles.corner, styles.cornerBL]} />
-            <View style={[styles.corner, styles.cornerBR]} />
+          <View style={styles.frame}>
+            <View style={[styles.corner, styles.tl]} />
+            <View style={[styles.corner, styles.tr]} />
+            <View style={[styles.corner, styles.bl]} />
+            <View style={[styles.corner, styles.br]} />
             {scanned && (
-              <View style={styles.scannedOverlay}>
-                <Ionicons name="checkmark-circle" size={48} color="#fff" />
+              <View style={styles.successOverlay}>
+                <Ionicons name="checkmark-circle" size={56} color="#fff" />
+                <Text style={styles.successText}>Scanned!</Text>
               </View>
             )}
           </View>
-          <View style={styles.overlaySide} />
+          <View style={styles.bandSide} />
         </View>
-        <View style={styles.overlayBottom}>
-          <Text style={styles.hintText}>
-            {scanned ? '✓ Scanned!' : (hint ?? 'Point camera at QR code or barcode')}
+
+        {/* Bottom dark band */}
+        <View style={styles.bandBottom}>
+          <Text style={styles.hint}>
+            {scanned
+              ? '✓  Scanned successfully!'
+              : (hint ?? 'Point camera at a QR code or barcode')}
           </Text>
         </View>
       </View>
@@ -119,28 +130,33 @@ export default function ScannerCamera({ onScan, active = true, hint }: Props) {
   );
 }
 
-const CORNER_SIZE = 24;
-const CORNER_THICKNESS = 3;
-
 const styles = StyleSheet.create({
-  container: {
+  fullScreen: {
     flex: 1,
     backgroundColor: '#000',
   },
-  permissionContainer: {
+  camera: {
+    flex: 1,
+  },
+  center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
     backgroundColor: '#f9fafb',
-    gap: 12,
+    padding: 32,
+    gap: 14,
   },
-  permissionTitle: {
-    fontSize: 18,
+  centerText: {
+    color: '#6b7280',
+    fontSize: 15,
+  },
+  permTitle: {
+    fontSize: 20,
     fontWeight: '700',
     color: '#111827',
+    textAlign: 'center',
   },
-  permissionText: {
+  permText: {
     fontSize: 14,
     color: '#6b7280',
     textAlign: 'center',
@@ -148,50 +164,51 @@ const styles = StyleSheet.create({
   permBtn: {
     marginTop: 8,
     backgroundColor: '#16a34a',
-    borderRadius: 10,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
   },
   permBtnText: {
     color: '#fff',
     fontWeight: '700',
+    fontSize: 15,
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: 'column',
-  },
-  overlayTop: {
+  // Overlay bands
+  bandTop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  overlayMiddle: {
-    height: FRAME_SIZE,
+  middle: {
     flexDirection: 'row',
+    height: FRAME_SIZE,
   },
-  overlaySide: {
+  bandSide: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  overlayBottom: {
+  bandBottom: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
-    paddingTop: 20,
+    paddingTop: 24,
+    gap: 8,
   },
   frame: {
     width: FRAME_SIZE,
     height: FRAME_SIZE,
-    position: 'relative',
   },
-  frameScanned: {
-    // Flash green when scanned
-  },
-  scannedOverlay: {
+  successOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(22,163,74,0.4)',
+    backgroundColor: 'rgba(22,163,74,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 4,
+    gap: 8,
+  },
+  successText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 18,
   },
   corner: {
     position: 'absolute',
@@ -199,34 +216,14 @@ const styles = StyleSheet.create({
     height: CORNER_SIZE,
     borderColor: '#22c55e',
   },
-  cornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: CORNER_THICKNESS,
-    borderLeftWidth: CORNER_THICKNESS,
-  },
-  cornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: CORNER_THICKNESS,
-    borderRightWidth: CORNER_THICKNESS,
-  },
-  cornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: CORNER_THICKNESS,
-    borderLeftWidth: CORNER_THICKNESS,
-  },
-  cornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: CORNER_THICKNESS,
-    borderRightWidth: CORNER_THICKNESS,
-  },
-  hintText: {
+  tl: { top: 0, left: 0, borderTopWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS },
+  tr: { top: 0, right: 0, borderTopWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS },
+  bl: { bottom: 0, left: 0, borderBottomWidth: CORNER_THICKNESS, borderLeftWidth: CORNER_THICKNESS },
+  br: { bottom: 0, right: 0, borderBottomWidth: CORNER_THICKNESS, borderRightWidth: CORNER_THICKNESS },
+  hint: {
     color: '#fff',
     fontSize: 14,
     textAlign: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
 });
