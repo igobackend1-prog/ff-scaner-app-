@@ -7,12 +7,13 @@ export type UserRole = 'hub_manager' | 'driver' | 'admin' | 'gm';
 export interface Profile {
   id: string;
   email: string | null;
-  phone: string | null;
-  full_name: string | null;
+  name: string | null;          // real column name in DB
   role: UserRole;
-  hub_id: string | null;
-  avatar_url: string | null;
+  hub_id: string | null;        // added via migration
+  department: string | null;
+  is_active: boolean;
   created_at: string;
+  updated_at: string | null;
   // joined via getProfile()
   hub?: Hub;
 }

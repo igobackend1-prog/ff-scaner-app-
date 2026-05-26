@@ -4,6 +4,12 @@
 -- Project: bvbfnguqpuctdvfztuda
 -- ============================================================
 
+-- ── Step 0: Add hub_id column to profiles (safe if already exists) ──
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS hub_id UUID REFERENCES public.hubs(id);
+
+
+-- ── Step 1–3: Create hub manager auth accounts + profiles ────────────
 DO $$
 DECLARE
   hyd_id  UUID := gen_random_uuid();
@@ -26,7 +32,7 @@ BEGIN
     crypt('FF@HYD2026', gen_salt('bf')),
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Hyderabad Hub Manager"}',
+    '{"name":"Hyderabad Hub Manager"}',
     false, ''
   );
 
@@ -40,7 +46,7 @@ BEGIN
     'email', NOW(), NOW(), NOW()
   );
 
-  INSERT INTO public.profiles (id, email, full_name, role, hub_id, created_at)
+  INSERT INTO public.profiles (id, email, name, role, hub_id, created_at)
   VALUES (
     hyd_id,
     'manager.hyd@ffactory.com',
@@ -50,10 +56,10 @@ BEGIN
     NOW()
   )
   ON CONFLICT (id) DO UPDATE SET
-    email    = EXCLUDED.email,
-    full_name = EXCLUDED.full_name,
-    role     = EXCLUDED.role,
-    hub_id   = EXCLUDED.hub_id;
+    email  = EXCLUDED.email,
+    name   = EXCLUDED.name,
+    role   = EXCLUDED.role,
+    hub_id = EXCLUDED.hub_id;
 
 
   -- ── 2. Palikarani Hub Manager ────────────────────────────
@@ -71,7 +77,7 @@ BEGIN
     crypt('FF@PALI2026', gen_salt('bf')),
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Palikarani Hub Manager"}',
+    '{"name":"Palikarani Hub Manager"}',
     false, ''
   );
 
@@ -85,7 +91,7 @@ BEGIN
     'email', NOW(), NOW(), NOW()
   );
 
-  INSERT INTO public.profiles (id, email, full_name, role, hub_id, created_at)
+  INSERT INTO public.profiles (id, email, name, role, hub_id, created_at)
   VALUES (
     pali_id,
     'manager.pali@ffactory.com',
@@ -95,10 +101,10 @@ BEGIN
     NOW()
   )
   ON CONFLICT (id) DO UPDATE SET
-    email    = EXCLUDED.email,
-    full_name = EXCLUDED.full_name,
-    role     = EXCLUDED.role,
-    hub_id   = EXCLUDED.hub_id;
+    email  = EXCLUDED.email,
+    name   = EXCLUDED.name,
+    role   = EXCLUDED.role,
+    hub_id = EXCLUDED.hub_id;
 
 
   -- ── 3. Vanagaram Hub Manager ─────────────────────────────
@@ -116,7 +122,7 @@ BEGIN
     crypt('FF@VANA2026', gen_salt('bf')),
     NOW(), NOW(), NOW(),
     '{"provider":"email","providers":["email"]}',
-    '{"full_name":"Vanagaram Hub Manager"}',
+    '{"name":"Vanagaram Hub Manager"}',
     false, ''
   );
 
@@ -130,7 +136,7 @@ BEGIN
     'email', NOW(), NOW(), NOW()
   );
 
-  INSERT INTO public.profiles (id, email, full_name, role, hub_id, created_at)
+  INSERT INTO public.profiles (id, email, name, role, hub_id, created_at)
   VALUES (
     vana_id,
     'manager.vana@ffactory.com',
@@ -140,10 +146,10 @@ BEGIN
     NOW()
   )
   ON CONFLICT (id) DO UPDATE SET
-    email    = EXCLUDED.email,
-    full_name = EXCLUDED.full_name,
-    role     = EXCLUDED.role,
-    hub_id   = EXCLUDED.hub_id;
+    email  = EXCLUDED.email,
+    name   = EXCLUDED.name,
+    role   = EXCLUDED.role,
+    hub_id = EXCLUDED.hub_id;
 
 
   RAISE NOTICE 'Hub manager accounts created successfully.';
@@ -156,9 +162,6 @@ END $$;
 
 -- Enable RLS (idempotent)
 ALTER TABLE public.boxes ENABLE ROW LEVEL SECURITY;
-
--- Helper: get current user's hub_id
--- (used in all policies below)
 
 -- INSERT: hub managers can only create boxes for their own hub
 DROP POLICY IF EXISTS hub_manager_insert_boxes ON public.boxes;
@@ -198,7 +201,7 @@ WHERE email IN (
   'manager.vana@ffactory.com'
 );
 
-SELECT p.id, p.email, p.full_name, p.role, h.name AS hub_name, h.code AS hub_code
+SELECT p.id, p.email, p.name, p.role, h.name AS hub_name, h.code AS hub_code
 FROM public.profiles p
 LEFT JOIN public.hubs h ON h.id = p.hub_id
 WHERE p.email IN (
