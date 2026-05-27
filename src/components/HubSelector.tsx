@@ -83,11 +83,13 @@ export default function HubSelector({ selectedHubId, onSelect }: Props) {
   }, [userLat, userLng]);
 
   const loadHubs = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('hubs')
       .select('id, name, code, address, lat, lng, radius_km, is_active')
-      .eq('is_active', true)
-      .order('name');
+      .order('name');   // removed is_active filter — hubs may have null/false
+    if (error) {
+      console.warn('[HubSelector] fetch error:', error.message);
+    }
     if (data) {
       const rows = data as HubRow[];
       setHubs(rows);
@@ -244,6 +246,15 @@ export default function HubSelector({ selectedHubId, onSelect }: Props) {
             data={hubs}
             keyExtractor={h => h.id}
             contentContainerStyle={{ padding: 16, gap: 10 }}
+            ListEmptyComponent={
+              <View style={{ alignItems: 'center', paddingVertical: 48, gap: 10 }}>
+                <Ionicons name="business-outline" size={40} color="#d1d5db" />
+                <Text style={{ color: '#9ca3af', fontSize: 14 }}>No hubs found in database</Text>
+                <Text style={{ color: '#d1d5db', fontSize: 12, textAlign: 'center', paddingHorizontal: 24 }}>
+                  Check that the hubs table has data and RLS allows reading
+                </Text>
+              </View>
+            }
             renderItem={({ item: hub }) => {
               const isSelected = hub.id === selectedHubId;
               return (
