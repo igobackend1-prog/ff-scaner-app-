@@ -1,55 +1,82 @@
 // @ts-nocheck
 /**
  * EOD Wastage Alarm Utilities
- * Schedules a daily 19:30 push notification and checks in-app banner state.
+ *
+ * Push notifications require a DEVELOPMENT BUILD — they do NOT work in Expo Go
+ * (removed since SDK 53). This file detects Expo Go and skips notification
+ * setup silently. The in-app red banner works in both Expo Go and prod builds.
  */
 
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
 
-// Set how notifications appear when app is in foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// ── Detect if running inside Expo Go ─────────────────────────
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// ── Lazy-load expo-notifications only in non-Expo-Go builds ──
+let Notifications: any = null;
+
+function getNotifications() {
+  if (isExpoGo) return null;
+  if (!Notifications) {
+    try {
+      Notifications = require('expo-notifications');
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: false,
+        }),
+      });
+    } catch (e) {
+      console.warn('[EOD Alarm] expo-notifications not available:', e);
+    }
+  }
+  return Notifications;
+}
 
 /**
- * Call once on app startup (in App.tsx useEffect).
- * Requests permission and schedules daily 19:30 alarm.
+ * Call once on app startup (App.tsx useEffect).
+ * In Expo Go → silently skips push setup (in-app banner still works).
+ * In dev/prod build → schedules daily 19:30 notification.
  */
 export async function setupEODAlarm(): Promise<void> {
+  if (isExpoGo) {
+    console.log('[EOD Alarm] Expo Go detected — push notifications skipped. In-app banner is active.');
+    return;
+  }
+
+  const N = getNotifications();
+  if (!N) return;
+
   try {
-    // Android: set up notification channel
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('eod-wastage', {
+      await N.setNotificationChannelAsync('eod-wastage', {
         name: 'EOD Wastage Reminder',
-        importance: Notifications.AndroidImportance.HIGH,
+        importance: N.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#dc2626',
         sound: 'default',
       });
     }
 
-    const { status } = await Notifications.requestPermissionsAsync();
+    const { status } = await N.requestPermissionsAsync();
     if (status !== 'granted') {
       console.log('[EOD Alarm] Notification permission not granted');
       return;
     }
 
-    // Cancel any previously scheduled EOD notifications to avoid duplicates
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    // Cancel existing EOD notifications to avoid duplicates
+    const scheduled = await N.getAllScheduledNotificationsAsync();
     for (const n of scheduled) {
-      if (n.content.data?.type === 'eod_wastage') {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      if (n.content?.data?.type === 'eod_wastage') {
+        await N.cancelScheduledNotificationAsync(n.identifier);
       }
     }
 
-    // Schedule daily at 19:30
-    await Notifications.scheduleNotificationAsync({
+    // Schedule daily 19:30
+    await N.scheduleNotificationAsync({
       content: {
         title: '🚨 EOD Wastage Entry Due',
         body: "Don't forget to submit today's wastage report before closing!",
@@ -57,11 +84,7 @@ export async function setupEODAlarm(): Promise<void> {
         data: { type: 'eod_wastage' },
         ...(Platform.OS === 'android' ? { channelId: 'eod-wastage' } : {}),
       },
-      trigger: {
-        hour: 19,
-        minute: 30,
-        repeats: true,
-      },
+      trigger: { hour: 19, minute: 30, repeats: true },
     });
 
     console.log('[EOD Alarm] Daily 19:30 alarm scheduled ✅');
@@ -79,7 +102,7 @@ export function isAfterEODTime(): boolean {
 }
 
 /**
- * Returns true if at least one wastage entry was submitted today for this hub.
+ * Returns true if at least one wastage entry exists today for this hub.
  */
 export async function isTodayWastageSubmitted(hubId: string): Promise<boolean> {
   try {
@@ -97,7 +120,7 @@ export async function isTodayWastageSubmitted(hubId: string): Promise<boolean> {
 
 /**
  * Returns true if the in-app EOD banner should be shown.
- * Condition: after 19:30 AND no wastage entry submitted today.
+ * Works in BOTH Expo Go and production builds.
  */
 export async function shouldShowEODBanner(hubId: string): Promise<boolean> {
   if (!isAfterEODTime()) return false;
