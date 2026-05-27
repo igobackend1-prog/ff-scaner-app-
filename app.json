@@ -17,7 +17,8 @@
       "bundleIdentifier": "com.farmersfactory.scanner",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to scan QR codes and barcodes on boxes.",
-        "NSPhotoLibraryUsageDescription": "This app accesses photos for QC evidence."
+        "NSPhotoLibraryUsageDescription": "This app accesses photos for QC evidence.",
+        "NSLocationWhenInUseUsageDescription": "FF Scanner uses your location to auto-select the nearest hub."
       }
     },
     "android": {
@@ -28,7 +29,9 @@
       "package": "com.farmersfactory.scanner",
       "permissions": [
         "CAMERA",
-        "READ_EXTERNAL_STORAGE"
+        "READ_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
@@ -48,6 +51,12 @@
         {
           "photosPermission": "FF Scanner uses photos to document wastage evidence.",
           "cameraPermission": "FF Scanner uses the camera to photograph wastage items."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "FF Scanner uses your location to auto-select the nearest hub."
         }
       ],
       [
