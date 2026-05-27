@@ -83,15 +83,22 @@ export default function HubSelector({ selectedHubId, onSelect }: Props) {
   }, [userLat, userLng]);
 
   const loadHubs = async () => {
+    // Select * to avoid failing if any column (like radius_km) doesn't exist in this DB
     const { data, error } = await supabase
       .from('hubs')
-      .select('id, name, code, address, lat, lng, radius_km, is_active')
-      .order('name');   // removed is_active filter — hubs may have null/false
+      .select('*')
+      .order('name');
     if (error) {
-      console.warn('[HubSelector] fetch error:', error.message);
+      console.warn('[HubSelector] fetch error:', error.message, error.code);
     }
     if (data) {
-      const rows = data as HubRow[];
+      // Normalise rows — set radius_km default 5 if missing
+      const rows: HubRow[] = (data as any[]).map(h => ({
+        ...h,
+        radius_km: h.radius_km ?? 5,
+        lat: h.lat ?? null,
+        lng: h.lng ?? null,
+      }));
       setHubs(rows);
 
       // Auto-select logic on first load
