@@ -7,7 +7,7 @@ interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
-  hub: Hub | null;           // current manager's hub (shortcut)
+  hub: Hub | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -31,25 +31,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading]   = useState(true);
 
   const loadProfile = async (userId: string) => {
-    const { data } = await getProfile(userId);
-    if (data) {
-      const p = data as Profile;
-      setProfile(p);
-      // hub is joined from getProfile (*, hub:hubs(...))
-      setHub((p.hub as Hub) ?? null);
+    try {
+      const { data, error } = await getProfile(userId);
+      if (error) {
+        console.warn('loadProfile error:', error.message);
+        return;
+      }
+      if (data) {
+        const p = data as Profile;
+        setProfile(p);
+        setHub((p.hub as Hub) ?? null);
+      }
+    } catch (e) {
+      console.warn('loadProfile exception:', e);
     }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadProfile(session.user.id).finally(() => setLoading(false));
-      } else {
+    // Safety timeout — if Supabase hangs for >8s, stop the spinner
+    const timeout = setTimeout(() => {
+      console.warn('AuthContext: getSession timed out, forcing loading=false');
+      setLoading(false);
+    }, 8000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(timeout);
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          loadProfile(session.user.id).finally(() => setLoading(false));
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        clearTimeout(timeout);
+        console.warn('getSession error:', err);
         setLoading(false);
-      }
-    });
+      });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -64,7 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {

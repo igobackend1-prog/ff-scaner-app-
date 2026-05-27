@@ -42,6 +42,21 @@
         {
           "cameraPermission": "Allow FF Scanner to access your camera to scan box labels."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FF Scanner uses photos to document wastage evidence.",
+          "cameraPermission": "FF Scanner uses the camera to photograph wastage items."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#dc2626",
+          "sounds": []
+        }
       ]
     ],
     "scheme": "ff-scanner",

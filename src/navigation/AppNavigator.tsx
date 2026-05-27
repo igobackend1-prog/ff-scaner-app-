@@ -14,7 +14,7 @@ import LoginScreen from '@/screens/auth/LoginScreen';
 import HubDashboard from '@/screens/hub/HubDashboard';
 import ScanReceiveScreen from '@/screens/hub/ScanReceiveScreen';
 import QCScreen from '@/screens/hub/QCScreen';
-import WastageScreen from '@/screens/hub/WastageScreen';
+import WastageEntryScreen from '@/screens/hub/WastageEntryScreen';
 
 // Driver
 import DriverDashboard from '@/screens/driver/DriverDashboard';
@@ -68,14 +68,24 @@ function HubTabs() {
         headerStyle: { backgroundColor: '#16a34a' },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: '700' },
-        // Hub name under each screen title
         headerTitle: () => <HubHeaderTitle routeName={route.name} />,
         headerRight: () => <SignOutButton />,
       })}
     >
       <Tab.Screen name="Dashboard" component={HubDashboard} />
       <Tab.Screen name="Scan & Receive" component={ScanReceiveScreen} />
-      <Tab.Screen name="Wastage" component={WastageScreen} />
+      <Tab.Screen
+        name="Wastage"
+        component={WastageEntryScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="warning-outline" size={size} color={color} />
+          ),
+          tabBarActiveTintColor: '#ea580c',
+          headerStyle: { backgroundColor: '#ea580c' },
+          headerTitle: () => <HubHeaderTitle routeName="EOD Wastage" />,
+        }}
+      />
     </Tab.Navigator>
   );
 }

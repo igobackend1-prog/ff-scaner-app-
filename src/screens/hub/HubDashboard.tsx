@@ -138,7 +138,7 @@ export default function HubDashboard() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Good {getGreeting()},</Text>
-          <Text style={styles.name}>{profile?.full_name ?? 'Manager'}</Text>
+          <Text style={styles.name}>{profile?.name ?? 'Manager'}</Text>
           <Text style={styles.hubBadge}>🏭 Hub Manager</Text>
         </View>
         <TouchableOpacity onPress={signOut} style={styles.signOutBtn}>
