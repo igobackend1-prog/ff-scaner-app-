@@ -49,6 +49,7 @@ export default function WastageEntryScreen() {
   const [submitting, setSubmitting]         = useState(false);
   const [submitted, setSubmitted]           = useState(false);
   const [submittedEntry, setSubmittedEntry] = useState<any>(null);
+  const [submitError, setSubmitError]       = useState<string | null>(null);
 
   // Today's entries
   const [todayEntries, setTodayEntries]     = useState<WastageEntry[]>([]);
@@ -135,14 +136,17 @@ export default function WastageEntryScreen() {
       const { error } = await supabase.storage
         .from('wastage-photos')
         .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
-      if (error) throw error;
+      if (error) {
+        console.error('Storage upload error:', error.message, error);
+        throw new Error(`Photo upload failed: ${error.message}`);
+      }
       const { data: { publicUrl } } = supabase.storage
         .from('wastage-photos')
         .getPublicUrl(path);
       return publicUrl;
-    } catch (e) {
-      console.error('Upload error:', e);
-      return null;
+    } catch (e: any) {
+      console.error('Upload error:', e?.message ?? e);
+      throw e; // re-throw so handleSubmit catches it with the real message
     }
   };
 
@@ -157,24 +161,24 @@ export default function WastageEntryScreen() {
 
   // ── Submit ────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!canSubmit || !profile) return;
+    if (!profile) {
+      Alert.alert('Not logged in', 'Please sign in first.');
+      return;
+    }
+    if (!canSubmit) return;
+
     setSubmitting(true);
+    setSubmitError(null);
+
     try {
       const uuid = `${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
       const hubId = selectedHub!.id;
       const p1Path = `${hubId}/${today}/${uuid}_1.jpg`;
       const p2Path = `${hubId}/${today}/${uuid}_2.jpg`;
 
-      const [photo1Url, photo2Url] = await Promise.all([
-        uploadPhoto(photo1!, p1Path),
-        uploadPhoto(photo2!, p2Path),
-      ]);
-
-      if (!photo1Url || !photo2Url) {
-        Alert.alert('Upload Failed', 'Could not upload photos. Check your connection.');
-        setSubmitting(false);
-        return;
-      }
+      // Upload photos one at a time so we get a clear error if one fails
+      const photo1Url = await uploadPhoto(photo1!, p1Path);
+      const photo2Url = await uploadPhoto(photo2!, p2Path);
 
       const { data, error } = await supabase
         .from('wastage_entries')
@@ -198,10 +202,14 @@ export default function WastageEntryScreen() {
 
       setSubmittedEntry(data);
       setSubmitted(true);
+      setSubmitError(null);
       setShowEODBanner(false);
       await loadTodayEntries();
     } catch (e: any) {
-      Alert.alert('Submit Failed', e?.message ?? 'Unknown error.');
+      const msg = e?.message ?? JSON.stringify(e) ?? 'Unknown error';
+      console.error('Submit error:', msg);
+      setSubmitError(msg);  // show on screen — not just Alert
+      Alert.alert('Submit Failed', msg);
     }
     setSubmitting(false);
   };
@@ -413,6 +421,17 @@ export default function WastageEntryScreen() {
         ) : null}
       </View>
 
+      {/* Submit error banner */}
+      {submitError ? (
+        <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={18} color="#fff" />
+          <Text style={styles.errorBannerText}>{submitError}</Text>
+          <TouchableOpacity onPress={() => setSubmitError(null)}>
+            <Ionicons name="close" size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {/* Submit button */}
       <TouchableOpacity
         style={[styles.submitBtn, !canSubmit && styles.submitBtnOff]}
@@ -535,6 +554,13 @@ const styles = StyleSheet.create({
 
   hintBox: { backgroundColor: '#fef2f2', borderRadius: 8, padding: 10, marginTop: 12, gap: 3 },
   hintText: { fontSize: 12, color: '#dc2626', fontWeight: '500' },
+
+  errorBanner: {
+    backgroundColor: '#dc2626', borderRadius: 10,
+    padding: 12, flexDirection: 'row', alignItems: 'center',
+    gap: 8, marginBottom: 12,
+  },
+  errorBannerText: { color: '#fff', fontSize: 12, fontWeight: '600', flex: 1 },
 
   submitBtn: {
     backgroundColor: '#ea580c', borderRadius: 14, paddingVertical: 16,
