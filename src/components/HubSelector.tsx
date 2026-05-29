@@ -83,35 +83,67 @@ export default function HubSelector({ selectedHubId, onSelect }: Props) {
   }, [userLat, userLng]);
 
   const loadHubs = async () => {
-    // Select * to avoid failing if any column (like radius_km) doesn't exist in this DB
-    const { data, error } = await supabase
-      .from('hubs')
-      .select('*')
-      .order('name');
-    if (error) {
-      console.warn('[HubSelector] fetch error:', error.message, error.code);
-    }
-    if (data) {
-      // Normalise rows — set radius_km default 5 if missing
-      const rows: HubRow[] = (data as any[]).map(h => ({
-        ...h,
-        radius_km: h.radius_km ?? 5,
-        lat: h.lat ?? null,
-        lng: h.lng ?? null,
-      }));
+    try {
+      // Race the fetch against a 10s timeout so a dead/slow network can NEVER
+      // hang the spinner forever. The bare `await` had no timeout, so on a weak
+      // connection it never resolved and setLoading(false) was never reached.
+      const fetchHubs = supabase.from('hubs').select('*').order('name');
+      const timeout = new Promise<{ data: null; error: { message: string; code: string } }>(
+        resolve => setTimeout(
+          () => resolve({ data: null, error: { message: 'Request timed out', code: 'TIMEOUT' } }),
+          10000,
+        ),
+      );
+      const { data, error } = (await Promise.race([fetchHubs, timeout])) as any;
+
+      if (error) {
+        console.warn('[HubSelector] fetch error:', error.message, error.code);
+      }
+
+      // Normalise whatever rows we got — set radius_km default 5 if missing
+      let rows: HubRow[] = Array.isArray(data)
+        ? (data as any[]).map(h => ({
+            ...h,
+            radius_km: h.radius_km ?? 5,
+            lat: h.lat ?? null,
+            lng: h.lng ?? null,
+          }))
+        : [];
+
+      // Fallback: a locked hub_manager is tied to exactly one hub. If the fetch
+      // failed / timed out / returned nothing, use the hub already loaded on their
+      // profile so they are NEVER stranded on "Loading hubs…".
+      if (rows.length === 0 && isLocked && profile?.hub_id) {
+        const ph = profile.hub;
+        rows = [{
+          id: profile.hub_id,
+          name: ph?.name ?? 'My Hub',
+          code: ph?.code ?? '',
+          address: ph?.address ?? null,
+          lat: ph?.lat ?? null,
+          lng: ph?.lng ?? null,
+          radius_km: ph?.radius_km ?? 5,
+          is_active: true,
+        }];
+      }
+
       setHubs(rows);
 
       // Auto-select logic on first load
       if (!selectedHubId && rows.length > 0) {
         if (isLocked && profile?.hub_id) {
-          const assigned = rows.find(h => h.id === profile.hub_id);
+          const assigned = rows.find(h => h.id === profile.hub_id) ?? rows[0];
           if (assigned) onSelect(assigned);
         } else if (rows.length === 1) {
           onSelect(rows[0]);
         }
       }
+    } catch (e: any) {
+      console.warn('[HubSelector] loadHubs exception:', e?.message ?? e);
+    } finally {
+      // ALWAYS stop the spinner, no matter what happened above.
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const requestLocation = async () => {

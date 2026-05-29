@@ -24,7 +24,7 @@ interface WastageEntry {
 
 // ─── Main Screen ─────────────────────────────────────────────
 export default function WastageEntryScreen() {
-  const { profile, hub: authHub } = useAuth();
+  const { profile, user, hub: authHub } = useAuth();
   const today = new Date().toISOString().split('T')[0];
   const todayFormatted = new Date().toLocaleDateString('en-IN', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -161,7 +161,11 @@ export default function WastageEntryScreen() {
 
   // ── Submit ────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!profile) {
+    // Need an authenticated user id for submitted_by + RLS. Prefer the loaded
+    // profile, but fall back to the auth session user so a transient profile-load
+    // hiccup never blocks a valid, logged-in manager from submitting.
+    const submitterId = profile?.id ?? user?.id;
+    if (!submitterId) {
       Alert.alert('Not logged in', 'Please sign in first.');
       return;
     }
@@ -192,7 +196,7 @@ export default function WastageEntryScreen() {
           photo_1_url: photo1Url,
           photo_2_url: photo2Url,
           entry_date: today,
-          submitted_by: profile.id,
+          submitted_by: submitterId,
           notes: notes.trim() || null,
         })
         .select()

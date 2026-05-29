@@ -169,12 +169,49 @@ export async function updatePackStatus(packId: string, status: string) {
 // ─────────────────────────────────────────────
 
 export async function getProfile(userId: string) {
-  const { data, error } = await supabase
+  // Attempt 1: profile + embedded hub join (requires PostgREST to know the hub_id FK)
+  const joined = await supabase
     .from('profiles')
     .select('*, hub:hubs(id, name, code, address)')
     .eq('id', userId)
     .single();
-  return { data, error };
+
+  if (!joined.error) return joined;
+
+  // The join can fail for several reasons (stale PostgREST schema cache after
+  // ALTER TABLE, hub RLS, FK not detected, etc.). Rather than only retrying on
+  // "schema" errors, ALWAYS fall back to a plain profile fetch so a null profile
+  // never silently strands the user on a screen they can't use.
+  console.warn('[getProfile] Hub-join query failed, falling back to plain profile:', joined.error.message);
+
+  const plain = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (plain.error) {
+    // This is the real problem if it happens — RLS denying/recursing on profiles.
+    console.error(
+      '[getProfile] Plain profile fetch ALSO failed. The user is authenticated but cannot read their own profile row. ' +
+      'This is almost always an RLS issue on public.profiles (e.g. infinite recursion via a helper function that is not SECURITY DEFINER). Error:',
+      plain.error.message,
+      plain.error
+    );
+    return plain;
+  }
+
+  // Best-effort: fetch the hub separately so the UI still gets hub context.
+  if (plain.data?.hub_id) {
+    const { data: hub } = await supabase
+      .from('hubs')
+      .select('id, name, code, address')
+      .eq('id', plain.data.hub_id)
+      .single();
+    if (hub) (plain.data as any).hub = hub;
+  }
+
+  return plain;
 }
 
 /** Fetch boxes scoped to the current manager's hub */
