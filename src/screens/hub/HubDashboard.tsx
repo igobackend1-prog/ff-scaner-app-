@@ -56,10 +56,10 @@ export default function HubDashboard() {
 
     // Wastage today
     const { count: wastage } = await supabase
-      .from('wastage_log')
+      .from('wastage_entries')
       .select('*', { count: 'exact', head: true })
       .eq('hub_id', profile.hub_id)
-      .gte('logged_at', today);
+      .gte('entry_date', today);
 
     // Total stock at hub (sum of inventory.quantity)
     const { data: invData } = await supabase

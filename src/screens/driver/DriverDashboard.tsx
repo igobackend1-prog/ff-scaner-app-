@@ -75,7 +75,7 @@ export default function DriverDashboard() {
       <View style={styles.header}>
         <View>
           <Text style={styles.greeting}>Today's Route</Text>
-          <Text style={styles.name}>{profile?.full_name ?? 'Driver'}</Text>
+          <Text style={styles.name}>{profile?.name ?? 'Driver'}</Text>
           <Text style={styles.date}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
         </View>
         <TouchableOpacity onPress={signOut} style={styles.signOutBtn}>

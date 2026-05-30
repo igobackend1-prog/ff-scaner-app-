@@ -189,6 +189,7 @@ export default function WastageEntryScreen() {
         .insert({
           hub_id: hubId,
           hub_name: selectedHub!.name,
+          product_id: selectedProductId ?? null,
           item_name: itemName.trim(),
           quantity_kg: qty,
           amount: amount ? parseFloat(amount) : null,
